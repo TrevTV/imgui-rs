@@ -1,6 +1,9 @@
-use glium::glutin::event::{Event, WindowEvent};
-use glium::glutin::event_loop::{ControlFlow, EventLoop};
-use glium::Surface;
+use glium::glutin::surface::WindowSurface;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+use glium::{Surface, Display};
+use winit::platform::windows::WindowExtWindows;
+use winit::window::Window;
 
 const TITLE: &str = "Hello, imgui-rs!";
 
@@ -8,8 +11,8 @@ fn main() {
     // Common setup for creating a winit window and imgui context, not specifc
     // to this renderer at all except that glutin is used to create the window
     // since it will give us access to a GL context
-    let (event_loop, display) = create_window();
-    let (mut winit_platform, mut imgui_context) = imgui_init(&display);
+    let (event_loop, display, window) = create_window();
+    let (mut winit_platform, mut imgui_context) = imgui_init(&window);
 
     // Create renderer from this crate
     let mut renderer = imgui_glium_renderer::Renderer::init(&mut imgui_context, &display)
@@ -23,14 +26,14 @@ fn main() {
         Event::NewEvents(_) => {
             let now = std::time::Instant::now();
             imgui_context.io_mut().update_delta_time(now - last_frame);
+            println!("{:?}", now - last_frame);
             last_frame = now;
         }
         Event::MainEventsCleared => {
-            let gl_window = display.gl_window();
             winit_platform
-                .prepare_frame(imgui_context.io_mut(), gl_window.window())
+                .prepare_frame(imgui_context.io_mut(), &window)
                 .expect("Failed to prepare frame");
-            gl_window.window().request_redraw();
+            window.request_redraw();
         }
         Event::RedrawRequested(_) => {
             // Create frame for the all important `&imgui::Ui`
@@ -40,14 +43,13 @@ fn main() {
             ui.show_demo_window(&mut true);
 
             // Setup for drawing
-            let gl_window = display.gl_window();
             let mut target = display.draw();
 
             // Renderer doesn't automatically clear window
             target.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
 
             // Perform rendering
-            winit_platform.prepare_render(ui, gl_window.window());
+            winit_platform.prepare_render(ui, &window);
             let draw_data = imgui_context.render();
             renderer
                 .render(&mut target, draw_data)
@@ -59,32 +61,25 @@ fn main() {
             ..
         } => *control_flow = ControlFlow::Exit,
         event => {
-            let gl_window = display.gl_window();
-            winit_platform.handle_event(imgui_context.io_mut(), gl_window.window(), &event);
+            winit_platform.handle_event(imgui_context.io_mut(), &window, &event);
         }
     });
 }
 
-fn create_window() -> (EventLoop<()>, glium::Display) {
-    let event_loop = EventLoop::new();
-    let context = glium::glutin::ContextBuilder::new().with_vsync(true);
-    let builder = glium::glutin::window::WindowBuilder::new()
-        .with_title(TITLE.to_owned())
-        .with_inner_size(glium::glutin::dpi::LogicalSize::new(1024f64, 768f64));
-    let display =
-        glium::Display::new(builder, context, &event_loop).expect("Failed to initialize display");
+fn create_window() -> (EventLoop<()>, Display<WindowSurface>, Window) {
+    let event_loop = winit::event_loop::EventLoopBuilder::new().build();
+    let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
+            .with_title("Tack")
+            .build(&event_loop);
 
-    (event_loop, display)
+    (event_loop, display, window)
 }
 
-fn imgui_init(display: &glium::Display) -> (imgui_winit_support::WinitPlatform, imgui::Context) {
+fn imgui_init(window: &Window) -> (imgui_winit_support::WinitPlatform, imgui::Context) {
     let mut imgui_context = imgui::Context::create();
     imgui_context.set_ini_filename(None);
 
     let mut winit_platform = imgui_winit_support::WinitPlatform::init(&mut imgui_context);
-
-    let gl_window = display.gl_window();
-    let window = gl_window.window();
 
     let dpi_mode = imgui_winit_support::HiDpiMode::Default;
 

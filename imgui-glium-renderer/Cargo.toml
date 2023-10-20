@@ -10,8 +10,9 @@ license = "MIT OR Apache-2.0"
 categories = ["gui", "rendering"]
 
 [dependencies]
-glium = { version = "0.32.1", default-features = false }
+glium = { git = "https://github.com/glium/glium" }
 imgui = { version = "0.11.0", path = "../imgui" }
+winit = "0.28"
 
 [dev-dependencies]
 imgui-winit-support = {path = "../imgui-winit-support"}
